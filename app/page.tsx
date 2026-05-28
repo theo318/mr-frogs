@@ -15,9 +15,9 @@ export default function ThreadsPage() {
     runExtract,
   } = useFlow();
 
-  const handleExtract = async () => {
-    const ok = await runExtract();
-    if (ok) router.push("/profile");
+  const handleExtract = () => {
+    void runExtract();
+    router.push("/profile");
   };
 
   return (

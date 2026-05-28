@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Intent Exchange",
+  "version": "0.1.0",
+  "description": "Native ChatGPT UX for the Intent Exchange. Your prompts become a sellable intent profile you control.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://chatgpt.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar.css"],
+      "matches": ["https://chatgpt.com/*"]
+    }
+  ]
+}

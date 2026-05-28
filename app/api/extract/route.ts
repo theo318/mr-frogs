@@ -6,39 +6,49 @@ import type { IntentProfile } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const SYSTEM_PROMPT = `You are an intent extraction agent for a personal intent exchange. The user has supplied transcripts of their own conversations with an AI assistant. Your job is to read them and produce a structured, sellable intent profile.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "https://chatgpt.com",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
 
-You output ONLY a single JSON object with this exact shape:
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+const SYSTEM_PROMPT = `You are an intent extraction agent. Read the user's AI-assistant transcripts and emit a sellable intent profile.
+
+Output ONLY this JSON object (no preamble, no fences):
 
 {
-  "summary": "2-3 sentence narrative of who this person seems to be",
+  "summary": "1-2 sentence narrative of this person",
   "top_categories": ["short", "category", "names"],
   "segments": [
     {
       "id": "kebab-case-id",
       "category": "Broad commercial category",
-      "label": "Short human-friendly label",
+      "label": "Short label",
       "intent_score": 0.0,
-      "buyer_signals": ["specific phrases or behaviours from the transcripts"],
+      "buyer_signals": ["specific phrases from the transcripts"],
       "suggested_advertisers": ["plausible brand types"],
       "floor_price_usd": 0.0,
       "sensitivity": "low" | "medium" | "high",
-      "rationale": "1-2 sentence justification grounded in the transcripts"
+      "rationale": "1 sentence justification"
     }
   ]
 }
 
 RULES:
-- Produce 3-6 segments. Quality over quantity.
-- intent_score: 0.0-1.0. 0.7+ means imminent purchase intent; 0.3-0.6 = exploratory; below 0.3 = weak/passing mention.
-- floor_price_usd: a realistic CPC-equivalent price for this segment. STRICT RANGE: minimum $0.10, maximum $0.80. Most consumer/hobby intent should sit in $0.10-$0.40. Only top-tier B2B / postgrad / founder-pipeline categories should approach $0.60-$0.80. Never exceed $0.80. Be conservative — pennies are normal.
+- 2-4 segments. Quality over quantity.
+- intent_score 0.0-1.0. 0.7+ = imminent purchase; 0.3-0.6 = exploratory.
+- floor_price_usd: realistic CPC. Min $0.10, max $0.80. Most $0.10-$0.40. Only premium B2B / postgrad / founder-pipeline can reach $0.60-$0.80.
 - sensitivity:
-    - "low" = generic commercial interest (gear, software, courses, hobbies)
-    - "medium" = professional / career / financial decisions
-    - "high" = health, mental state, relationships, politics, anything the user might prefer not to sell. Even if the segment looks lucrative, mark it high.
+    - "low" = general commercial (gear, software, courses, hobbies)
+    - "medium" = professional / career / finance
+    - "high" = health, mental state, relationships, politics — mark high even if lucrative
 - Be conservative on sensitivity. When in doubt, mark higher.
-- buyer_signals must be grounded in the transcripts. Do not invent.
-- Output ONLY the JSON object. No preamble, no markdown fences.`;
+- buyer_signals MUST be grounded in the transcripts. Do not invent.`;
 
 export async function POST(req: Request) {
   try {
@@ -53,8 +63,14 @@ export async function POST(req: Request) {
 
     const response = await anthropic.messages.create({
       model: MODEL_EXTRACT,
-      max_tokens: 1200,
-      system: SYSTEM_PROMPT,
+      max_tokens: 900,
+      system: [
+        {
+          type: "text",
+          text: SYSTEM_PROMPT,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
       messages: [
         { role: "user", content: userBlock },
         { role: "assistant", content: "{" },

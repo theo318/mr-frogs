@@ -13,11 +13,11 @@ const STEPS = [
 
 export function Stepper() {
   const pathname = usePathname();
-  const { profile, bids, sale } = useFlow();
+  const { profile, extracting, bids, sale } = useFlow();
 
   const reachable = (href: string) => {
     if (href === "/") return true;
-    if (href === "/profile") return !!profile;
+    if (href === "/profile") return !!profile || extracting;
     if (href === "/auction") return !!profile;
     if (href === "/sale") return !!sale || bids.length > 0;
     return false;

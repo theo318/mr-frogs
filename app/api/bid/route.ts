@@ -7,6 +7,17 @@ import type { Advertiser } from "@/lib/advertisers";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "https://chatgpt.com",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
 const BASE_SYSTEM_PROMPT = `You are a buy-side bidding agent role-playing a specific advertiser. You receive one intent segment about a user and your job is to decide whether to bid and, if so, how much.
 
 Output ONLY this JSON object:

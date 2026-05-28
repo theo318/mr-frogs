@@ -60,20 +60,42 @@ gh repo create intent-exchange --public --source=. --push
 
 Then on Vercel: import the repo, set `ANTHROPIC_API_KEY`, deploy.
 
+## Extension
+
+The Next.js app is the **dashboard / fallback** — a standalone walk-through of
+the demo loop at `localhost:3000`. The real surface is a Chrome MV3 extension
+that lives on `chatgpt.com` and acts as the **native UX layer for the intent
+exchange**: a Shadow-DOM sidebar that captures user prompts, calls the same
+backend, and renders the auction inline next to ChatGPT.
+
+See [`extension/README.md`](extension/README.md) for load-unpacked steps and
+the `BACKEND_URL` swap for Vercel deploys. The extension never talks to
+Anthropic directly — all model work goes through `/api/extract`, `/api/bid`,
+and `/api/advertisers` on the Next.js backend.
+
 ## Architecture
 
 ```
 app/
-  page.tsx              client UI — the whole 5-step demo loop
+  page.tsx              client UI — threads picker
+  profile/page.tsx      extracted intent profile
+  auction/page.tsx      consent engine + live bids
+  sale/page.tsx         receipt
+  providers.tsx         FlowProvider context across routes
   api/
-    extract/route.ts    POST conversations → IntentProfile (Sonnet 4.6)
+    extract/route.ts    POST conversations → IntentProfile (Haiku 4.5)
     bid/route.ts        POST {advertiser, segment} → Bid (Haiku 4.5)
+    advertisers/route.ts  GET advertiser list (for the extension)
 lib/
   types.ts              IntentProfile / IntentSegment / Bid / SaleResult
   sampleThreads.ts      personal-only seed threads
-  advertisers.ts        5 advertiser personas
+  advertisers.ts        6 advertiser personas (5 direct + Thrad aggregator)
   anthropic.ts          SDK client + model constants
   json.ts               tolerant JSON extractor
+extension/
+  manifest.json         Chrome MV3 manifest
+  content.js            Shadow-DOM sidebar + ChatGPT prompt observer
+  sidebar.css           dark zinc palette
 ```
 
 No DB. No auth. Everything in memory for the duration of the demo, which is
