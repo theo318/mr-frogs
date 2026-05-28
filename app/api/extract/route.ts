@@ -31,7 +31,7 @@ You output ONLY a single JSON object with this exact shape:
 RULES:
 - Produce 3-6 segments. Quality over quantity.
 - intent_score: 0.0-1.0. 0.7+ means imminent purchase intent; 0.3-0.6 = exploratory; below 0.3 = weak/passing mention.
-- floor_price_usd: a reasonable CPC-equivalent price for this segment. Higher intent and higher-LTV categories command more. Most segments will be $1-25.
+- floor_price_usd: a realistic CPC-equivalent price for this segment. STRICT RANGE: minimum $0.10, maximum $0.80. Most consumer/hobby intent should sit in $0.10-$0.40. Only top-tier B2B / postgrad / founder-pipeline categories should approach $0.60-$0.80. Never exceed $0.80. Be conservative — pennies are normal.
 - sensitivity:
     - "low" = generic commercial interest (gear, software, courses, hobbies)
     - "medium" = professional / career / financial decisions
@@ -53,9 +53,12 @@ export async function POST(req: Request) {
 
     const response = await anthropic.messages.create({
       model: MODEL_EXTRACT,
-      max_tokens: 2000,
+      max_tokens: 1200,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userBlock }],
+      messages: [
+        { role: "user", content: userBlock },
+        { role: "assistant", content: "{" },
+      ],
     });
 
     const textBlock = response.content.find((c) => c.type === "text");
@@ -63,7 +66,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Model returned no text" }, { status: 500 });
     }
 
-    const profile = extractJSON<IntentProfile>(textBlock.text);
+    const profile = extractJSON<IntentProfile>("{" + textBlock.text);
     return NextResponse.json({ profile });
   } catch (err) {
     console.error("extract error:", err);

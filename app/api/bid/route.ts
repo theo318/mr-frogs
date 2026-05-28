@@ -7,7 +7,7 @@ import type { Advertiser } from "@/lib/advertisers";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const SYSTEM_PROMPT = `You are a buy-side bidding agent role-playing a specific advertiser. You receive one intent segment about a user and your job is to decide whether to bid and, if so, how much.
+const BASE_SYSTEM_PROMPT = `You are a buy-side bidding agent role-playing a specific advertiser. You receive one intent segment about a user and your job is to decide whether to bid and, if so, how much.
 
 Output ONLY this JSON object:
 
@@ -24,6 +24,18 @@ RULES:
 - Higher intent_score and tighter category fit should push bids higher within your range.
 - ad_creative_hook should match your brand_voice and reference at least one specific buyer_signal.
 - Be honest: if your brand has no business advertising into this segment, return should_bid=false. Don't reach.`;
+
+const AGGREGATOR_BLOCK = `
+
+AGGREGATOR ECONOMICS — you are NOT an end advertiser:
+- You bid HIGHER than direct advertisers on broad, high-intent_score categories because you can syndicate that access across many downstream advertisers in your network. Push toward your budget_ceiling on broad segments with intent_score > 0.6.
+- You bid LOWER or set should_bid=false on narrow / niche segments where a single direct advertiser would extract more value than you can syndicate.
+- Your ad_creative_hook reflects that you're acquiring inventory access, not promoting a product. Frame it as positioning category supply for downstream advertiser demand (e.g. "category access for our travel-demand network").
+- Reference aggregator dynamics in your reasoning (syndication, downstream demand, wholesale arbitrage).`;
+
+function buildSystemPrompt(kind: "direct" | "aggregator"): string {
+  return kind === "aggregator" ? BASE_SYSTEM_PROMPT + AGGREGATOR_BLOCK : BASE_SYSTEM_PROMPT;
+}
 
 export async function POST(req: Request) {
   try {
@@ -47,8 +59,11 @@ export async function POST(req: Request) {
     const response = await anthropic.messages.create({
       model: MODEL_BID,
       max_tokens: 600,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userBlock }],
+      system: buildSystemPrompt(advertiser.kind),
+      messages: [
+        { role: "user", content: userBlock },
+        { role: "assistant", content: "{" },
+      ],
     });
 
     const textBlock = response.content.find((c) => c.type === "text");
@@ -61,7 +76,7 @@ export async function POST(req: Request) {
       bid_usd: number;
       ad_creative_hook: string;
       reasoning: string;
-    }>(textBlock.text);
+    }>("{" + textBlock.text);
 
     if (!parsed.should_bid) {
       return NextResponse.json({ bid: null, reasoning: parsed.reasoning });
