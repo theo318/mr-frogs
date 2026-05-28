@@ -1,6 +1,7 @@
 "use client";
 
 import type { Bid, IntentSegment, Sensitivity } from "@/lib/types";
+import type { PolicyOutcome } from "@/lib/policy";
 
 export const SENSITIVITY_LABEL: Record<Sensitivity, string> = {
   low: "Low — general commercial",
@@ -142,48 +143,76 @@ export function ConsentToggle({
   );
 }
 
-export function BidRow({
-  bid,
-  seg,
-  status,
+const OUTCOME_STYLES: Record<
+  PolicyOutcome,
+  { container: string; amount: string; status: string; label: string }
+> = {
+  pass: {
+    container: "border-lime-400/30 bg-lime-400/5",
+    amount: "text-lime-300",
+    status: "text-lime-400",
+    label: "passed",
+  },
+  flag: {
+    container: "border-violet-500/40 bg-violet-500/5",
+    amount: "text-violet-200",
+    status: "text-violet-300",
+    label: "flagged",
+  },
+  stop: {
+    container: "border-fuchsia-500/30 bg-zinc-950 opacity-60",
+    amount: "text-zinc-500",
+    status: "text-fuchsia-400",
+    label: "stopped",
+  },
+};
+
+export function PolicyBidRow({
+  advertiser,
+  segmentLabel,
+  bidUsd,
+  hook,
+  outcome,
+  triggeredRules,
+  reason,
   rank,
+  rightSlot,
 }: {
-  bid: Bid;
-  seg?: IntentSegment;
-  status: "eligible" | "blocked";
+  advertiser: string;
+  segmentLabel: string;
+  bidUsd: number;
+  hook: string;
+  outcome: PolicyOutcome;
+  triggeredRules: string[];
+  reason: string;
   rank?: number;
+  rightSlot?: React.ReactNode;
 }) {
-  const isBlocked = status === "blocked";
+  const s = OUTCOME_STYLES[outcome];
+  const ruleSuffix = triggeredRules.length > 0 ? `: ${triggeredRules.join(", ")}` : "";
   return (
     <div
-      className={`flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between ${
-        isBlocked
-          ? "border-zinc-900 bg-zinc-950 opacity-50"
-          : "border-zinc-800 bg-zinc-900/40"
-      }`}
+      className={`flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between ${s.container}`}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {rank && <span className="font-mono text-xs text-violet-400">#{rank}</span>}
-          <span className="text-sm font-medium">{bid.advertiser}</span>
+          <span className="text-sm font-medium">{advertiser}</span>
           <span className="text-xs text-zinc-500">→</span>
-          <span className="text-xs text-zinc-400">{seg?.label ?? bid.segment_id}</span>
+          <span className="text-xs text-zinc-400">{segmentLabel}</span>
         </div>
-        <div className="mt-1 text-xs italic text-zinc-400">
-          &ldquo;{bid.ad_creative_hook}&rdquo;
-        </div>
+        <div className="mt-1 text-xs italic text-zinc-400">&ldquo;{hook}&rdquo;</div>
+        {outcome !== "pass" && (
+          <div className="mt-1 font-mono text-[11px] text-zinc-500">
+            {s.label}
+            {ruleSuffix} — <span className="not-italic">{reason}</span>
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-0.5">
-        <div className={`font-mono text-base ${isBlocked ? "text-zinc-500" : "text-lime-300"}`}>
-          ${bid.bid_usd.toFixed(2)}
-        </div>
-        <div
-          className={`text-[10px] uppercase tracking-wider ${
-            isBlocked ? "text-fuchsia-400" : "text-lime-400"
-          }`}
-        >
-          {isBlocked ? "blocked" : "eligible"}
-        </div>
+      <div className="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1">
+        <div className={`font-mono text-base ${s.amount}`}>${bidUsd.toFixed(2)}</div>
+        <div className={`text-[10px] uppercase tracking-wider ${s.status}`}>{s.label}</div>
+        {rightSlot}
       </div>
     </div>
   );

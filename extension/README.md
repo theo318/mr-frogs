@@ -1,6 +1,6 @@
-# Intent Exchange — Chrome extension
+# Mr Frogs — Chrome extension
 
-The native ChatGPT UX layer for the Intent Exchange. Renders a Shadow-DOM-isolated sidebar on `chatgpt.com` that extracts an intent profile from your prompts, runs an advertiser auction, and lets you approve sales — all calling the existing Next.js backend.
+The native ChatGPT UX layer for Mr Frogs. Renders a Shadow-DOM-isolated sidebar on `chatgpt.com` that extracts an intent profile from your prompts, runs an advertiser auction, and lets you approve sales — all calling the existing Next.js backend.
 
 ## Load it
 

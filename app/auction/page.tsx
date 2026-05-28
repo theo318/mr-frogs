@@ -4,9 +4,9 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useFlow } from "../providers";
 import {
-  BidRow,
   ConsentToggle,
   PageHeader,
+  PolicyBidRow,
   PrimaryButton,
   SecondaryButton,
   SENSITIVITY_LABEL,
@@ -26,8 +26,11 @@ export default function AuctionPage() {
     setAllowHigh,
     reserveUsd,
     setReserveUsd,
-    eligibleBids,
-    blockedBids,
+    passedBids,
+    flaggedBids,
+    stoppedBids,
+    approvedFlaggedKeys,
+    approveFlagged,
     approveSale,
   } = useFlow();
 
@@ -36,6 +39,10 @@ export default function AuctionPage() {
   }, [profile, router]);
 
   if (!profile) return null;
+
+  const sellableCount =
+    passedBids.length +
+    flaggedBids.filter((f) => approvedFlaggedKeys.has(f.key)).length;
 
   const handleApprove = () => {
     const result = approveSale();
@@ -47,7 +54,7 @@ export default function AuctionPage() {
       <PageHeader
         step={3}
         title="Consent engine + live bids"
-        hint="Set what kinds of intent you'll sell and your reserve price. Only bids that pass both your rules are eligible. You — not the platform — close the auction."
+        hint="Set what kinds of intent you'll sell and your reserve price. Every bid runs through the pass / flag / stop policy. You — not the platform — close the auction."
       />
 
       <section className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900/40 p-5">
@@ -83,34 +90,23 @@ export default function AuctionPage() {
               <input
                 type="range"
                 min={0}
-                max={1}
-                step={0.05}
+                max={0.1}
+                step={0.005}
                 value={reserveUsd}
                 onChange={(e) => setReserveUsd(parseFloat(e.target.value))}
                 className="flex-1"
               />
-              <div className="w-20 text-right font-mono text-sm text-lime-300">
-                ${reserveUsd.toFixed(2)}
+              <div className="w-24 text-right font-mono text-sm text-lime-300">
+                ${reserveUsd.toFixed(3)}
               </div>
             </div>
             <div className="text-xs text-zinc-500">
               Bids below this won&apos;t complete even if the category is allowed.
-              All bids land between $0.10 and $1.00.
+              All bids land between $0.01 and $0.10.
             </div>
           </div>
         </div>
       </section>
-
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-lg font-medium">Live bids</h2>
-        <div className="text-xs text-zinc-500">
-          <span className="text-lime-400">{eligibleBids.length} eligible</span> ·{" "}
-          <span className="text-fuchsia-400">{blockedBids.length} blocked</span>
-          {bidding && (
-            <span className="ml-2 text-violet-300">· bidding…</span>
-          )}
-        </div>
-      </div>
 
       {bids.length === 0 && !bidding && (
         <div className="rounded-md border border-dashed border-zinc-800 p-6 text-center text-sm text-zinc-500">
@@ -118,40 +114,130 @@ export default function AuctionPage() {
         </div>
       )}
 
-      <div className="space-y-2">
-        {eligibleBids.map((b, i) => {
-          const seg = profile.segments.find((s) => s.id === b.segment_id);
+      <BucketSection
+        title="Passed"
+        count={passedBids.length}
+        color="lime"
+        hint="Auto-eligible. Highest bid wins on approval."
+      >
+        {passedBids.map((item, i) => (
+          <PolicyBidRow
+            key={item.key}
+            advertiser={item.bid.advertiser}
+            segmentLabel={item.segment.label}
+            bidUsd={item.bid.bid_usd}
+            hook={item.bid.ad_creative_hook}
+            outcome="pass"
+            triggeredRules={item.decision.triggered_rules}
+            reason={item.decision.reason}
+            rank={i + 1}
+          />
+        ))}
+      </BucketSection>
+
+      <BucketSection
+        title="Flagged"
+        count={flaggedBids.length}
+        color="violet"
+        hint="Sellable, but only after explicit approval."
+      >
+        {flaggedBids.map((item) => {
+          const approved = approvedFlaggedKeys.has(item.key);
           return (
-            <BidRow
-              key={`e-${b.advertiser}-${b.segment_id}-${i}`}
-              bid={b}
-              seg={seg}
-              status="eligible"
-              rank={i + 1}
+            <PolicyBidRow
+              key={item.key}
+              advertiser={item.bid.advertiser}
+              segmentLabel={item.segment.label}
+              bidUsd={item.bid.bid_usd}
+              hook={item.bid.ad_creative_hook}
+              outcome="flag"
+              triggeredRules={item.decision.triggered_rules}
+              reason={item.decision.reason}
+              rightSlot={
+                <button
+                  onClick={() => approveFlagged(item.key)}
+                  className={`mt-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${
+                    approved
+                      ? "border-lime-400 bg-lime-400/10 text-lime-300"
+                      : "border-violet-400/60 bg-violet-500/5 text-violet-200 hover:border-violet-300"
+                  }`}
+                >
+                  {approved ? "Approved" : "Approve this"}
+                </button>
+              }
             />
           );
         })}
-        {blockedBids.map((b, i) => {
-          const seg = profile.segments.find((s) => s.id === b.segment_id);
-          return (
-            <BidRow
-              key={`b-${b.advertiser}-${b.segment_id}-${i}`}
-              bid={b}
-              seg={seg}
-              status="blocked"
-            />
-          );
-        })}
-      </div>
+      </BucketSection>
+
+      <BucketSection
+        title="Stopped"
+        count={stoppedBids.length}
+        color="fuchsia"
+        hint="Blocked by the policy engine. Visible so the rules are explainable."
+      >
+        {stoppedBids.map((item) => (
+          <PolicyBidRow
+            key={item.key}
+            advertiser={item.bid.advertiser}
+            segmentLabel={item.segment.label}
+            bidUsd={item.bid.bid_usd}
+            hook={item.bid.ad_creative_hook}
+            outcome="stop"
+            triggeredRules={item.decision.triggered_rules}
+            reason={item.decision.reason}
+          />
+        ))}
+      </BucketSection>
 
       <div className="mt-6 flex items-center gap-3">
-        <PrimaryButton onClick={handleApprove} disabled={eligibleBids.length === 0}>
-          Approve top eligible sale →
+        <PrimaryButton onClick={handleApprove} disabled={sellableCount === 0}>
+          Approve top sale →
         </PrimaryButton>
         <SecondaryButton onClick={() => router.push("/profile")}>
           ← Back to profile
         </SecondaryButton>
+        <span className="text-xs text-zinc-500">
+          {sellableCount === 0
+            ? "No sellable bids yet"
+            : `${sellableCount} sellable (${passedBids.length} passed + ${
+                sellableCount - passedBids.length
+              } approved-flagged)`}
+        </span>
       </div>
     </div>
+  );
+}
+
+function BucketSection({
+  title,
+  count,
+  color,
+  hint,
+  children,
+}: {
+  title: string;
+  count: number;
+  color: "lime" | "violet" | "fuchsia";
+  hint: string;
+  children: React.ReactNode;
+}) {
+  if (count === 0) return null;
+  const tone =
+    color === "lime"
+      ? "text-lime-400"
+      : color === "violet"
+        ? "text-violet-400"
+        : "text-fuchsia-400";
+  return (
+    <section className="mb-5">
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className={`text-xs uppercase tracking-widest ${tone}`}>
+          {title} <span className="font-mono">·{" "}{count}</span>
+        </h2>
+        <span className="text-xs text-zinc-500">{hint}</span>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </section>
   );
 }

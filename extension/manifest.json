@@ -1,10 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Intent Exchange",
+  "name": "Mr Frogs",
   "version": "0.1.0",
-  "description": "Native ChatGPT UX for the Intent Exchange. Your prompts become a sellable intent profile you control.",
+  "description": "Native ChatGPT UX for Mr Frogs. Your prompts become a sellable intent profile you control.",
   "permissions": ["storage"],
   "host_permissions": ["https://chatgpt.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "content_scripts": [
     {
       "matches": ["https://chatgpt.com/*"],

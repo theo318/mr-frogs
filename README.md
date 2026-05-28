@@ -1,9 +1,9 @@
-# Intent Exchange
+# Mr Frogs 🐸
 
 Built for **Cursor × Thrad · London 2026**.
 
 > Thrad lets advertisers bid on your attention inside chat. Right now, you're
-> the inventory — not a party to the auction. **Intent Exchange flips it.**
+> the inventory — not a party to the auction. **Mr Frogs flips it.**
 > Your Claude history becomes an asset you own, price, and approve.
 
 ## The inversion
@@ -34,9 +34,16 @@ pillars:
 
 ## Bonus integrations
 
-Picked one (the highest-leverage). Stretch goals noted:
-
-- **Overmind (planned hot-swap of the consent engine)** — every "sell" action is the kind of in-flight policy check Overmind exists for: pass, flag for review, or stop cold. The current consent engine is intentionally written as a single filter function so it can be wrapped in an Overmind policy in one diff.
+- **Overmind (shipped)** — two parts. (1) `lib/policy.ts` is a real
+  pass / flag / stop policy engine modelled after Overmind's runtime
+  supervision primitive: every potential sale runs through priority-ordered
+  rules (`sensitivity_blocked` → stop, `bid_below_reserve` → stop,
+  `anomalous_bid` → flag, `medium_sensitivity_unverified` → flag, else pass)
+  and the UI surfaces the triggered rule and reason so the policy is
+  visibly explainable. Flagged bids require an explicit per-bid approval
+  click — the HITL handoff. (2) Every Anthropic call and every policy
+  decision emits an OpenTelemetry span to Overmind's OTLP endpoint, so the
+  full trace tree shows up live in `console.overmindlab.ai` during the demo.
 - **Tavily (stretch)** — enrich each segment with live advertiser/product context to improve floor pricing.
 - **Alpic (stretch)** — host the intent profile behind an MCP endpoint so advertiser agents can query it live.
 
@@ -51,11 +58,27 @@ pnpm dev
 
 Open <http://localhost:3000>.
 
+### Overmind setup (optional)
+
+The app runs identically with or without Overmind credentials — missing keys
+just mean no traces are sent. To wire up real tracing:
+
+1. Sign in at <https://console.overmindlab.ai> and create a project.
+2. Copy the project's API key (`ovr_...`).
+3. Paste it into `.env.local` as `OVERMIND_API_KEY`. The OTLP endpoint
+   defaults to `https://api.overmindlab.ai/api/v1/traces`; override it via
+   `OTEL_EXPORTER_OTLP_ENDPOINT` if needed.
+4. Restart the dev server. On startup you should see
+   `[overmind] tracing → https://api.overmindlab.ai/api/v1/traces` in the
+   logs. Walk through an auction and the spans (`anthropic.messages.create`
+   for each LLM call, `policy.check` for each bid evaluation) should appear
+   in the Overmind console.
+
 ## Deploy
 
 ```bash
 git init && git add . && git commit -m "init: intent exchange"
-gh repo create intent-exchange --public --source=. --push
+gh repo create mr-frogs --public --source=. --push
 ```
 
 Then on Vercel: import the repo, set `ANTHROPIC_API_KEY`, deploy.

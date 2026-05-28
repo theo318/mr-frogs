@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 import { anthropic, MODEL_EXTRACT } from "@/lib/anthropic";
 import { extractJSON } from "@/lib/json";
 import type { IntentProfile } from "@/lib/types";
+
+const tracer = trace.getTracer("mr-frogs.extract");
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -42,7 +45,7 @@ Output ONLY this JSON object (no preamble, no fences):
 RULES:
 - 2-4 segments. Quality over quantity.
 - intent_score 0.0-1.0. 0.7+ = imminent purchase; 0.3-0.6 = exploratory.
-- floor_price_usd: realistic CPC. Min $0.10, max $0.80. Most $0.10-$0.40. Only premium B2B / postgrad / founder-pipeline can reach $0.60-$0.80.
+- floor_price_usd: realistic CPC. Min $0.01, max $0.08. Most $0.01-$0.04. Only premium B2B / postgrad / founder-pipeline can reach $0.05-$0.08. Pennies are the norm.
 - sensitivity:
     - "low" = general commercial (gear, software, courses, hobbies)
     - "medium" = professional / career / finance
@@ -61,21 +64,49 @@ export async function POST(req: Request) {
       .map((t, i) => `=== Thread ${i + 1}: ${t.title} ===\n${t.full_text}`)
       .join("\n\n");
 
-    const response = await anthropic.messages.create({
-      model: MODEL_EXTRACT,
-      max_tokens: 900,
-      system: [
-        {
-          type: "text",
-          text: SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
+    const response = await tracer.startActiveSpan(
+      "anthropic.messages.create",
+      {
+        attributes: {
+          "llm.vendor": "anthropic",
+          "llm.model": MODEL_EXTRACT,
+          "llm.operation": "extract_intent_profile",
+          "mr_frogs.thread_count": threads.length,
         },
-      ],
-      messages: [
-        { role: "user", content: userBlock },
-        { role: "assistant", content: "{" },
-      ],
-    });
+      },
+      async (span) => {
+        try {
+          const r = await anthropic.messages.create({
+            model: MODEL_EXTRACT,
+            max_tokens: 900,
+            system: [
+              {
+                type: "text",
+                text: SYSTEM_PROMPT,
+                cache_control: { type: "ephemeral" },
+              },
+            ],
+            messages: [
+              { role: "user", content: userBlock },
+              { role: "assistant", content: "{" },
+            ],
+          });
+          span.setAttribute("llm.input_tokens", r.usage?.input_tokens ?? 0);
+          span.setAttribute("llm.output_tokens", r.usage?.output_tokens ?? 0);
+          span.setStatus({ code: SpanStatusCode.OK });
+          return r;
+        } catch (e) {
+          span.recordException(e as Error);
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: e instanceof Error ? e.message : String(e),
+          });
+          throw e;
+        } finally {
+          span.end();
+        }
+      },
+    );
 
     const textBlock = response.content.find((c) => c.type === "text");
     if (!textBlock || textBlock.type !== "text") {

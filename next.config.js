@@ -7,6 +7,16 @@ const CORS_HEADERS = [
 ];
 
 const nextConfig = {
+  experimental: {
+    instrumentationHook: true,
+    // OTel SDKs pull in Node-only deps (gRPC etc.) that Next can't bundle.
+    // Keep them external so they're required at runtime instead.
+    serverComponentsExternalPackages: [
+      "@opentelemetry/sdk-trace-node",
+      "@opentelemetry/sdk-trace-base",
+      "@opentelemetry/exporter-trace-otlp-http",
+    ],
+  },
   async headers() {
     return [
       {

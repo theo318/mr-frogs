@@ -3,7 +3,15 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { SAMPLE_THREADS } from "@/lib/sampleThreads";
 import { ADVERTISERS } from "@/lib/advertisers";
-import type { Bid, IntentProfile, SaleResult, Sensitivity } from "@/lib/types";
+import { checkPolicy, type ConsentRules, type PolicyDecision } from "@/lib/policy";
+import type { Bid, IntentProfile, IntentSegment, SaleResult } from "@/lib/types";
+
+export interface BidWithDecision {
+  bid: Bid;
+  segment: IntentSegment;
+  decision: PolicyDecision;
+  key: string; // `${advertiser}:${segment_id}`
+}
 
 interface FlowState {
   selected: string[];
@@ -27,9 +35,12 @@ interface FlowState {
   reserveUsd: number;
   setReserveUsd: (v: number) => void;
 
-  allowsSensitivity: (s: Sensitivity) => boolean;
-  eligibleBids: Bid[];
-  blockedBids: Bid[];
+  passedBids: BidWithDecision[];
+  flaggedBids: BidWithDecision[];
+  stoppedBids: BidWithDecision[];
+
+  approvedFlaggedKeys: Set<string>;
+  approveFlagged: (key: string) => void;
 
   sale: SaleResult | null;
   approveSale: () => SaleResult | null;
@@ -38,6 +49,10 @@ interface FlowState {
 }
 
 const FlowContext = createContext<FlowState | null>(null);
+
+function bidKey(b: Bid): string {
+  return `${b.advertiser}:${b.segment_id}`;
+}
 
 export function FlowProvider({ children }: { children: React.ReactNode }) {
   const [selected, setSelected] = useState<string[]>(SAMPLE_THREADS.map((t) => t.id));
@@ -49,8 +64,9 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
   const [allowLow, setAllowLow] = useState(true);
   const [allowMedium, setAllowMedium] = useState(true);
   const [allowHigh, setAllowHigh] = useState(false);
-  const [reserveUsd, setReserveUsd] = useState(0.1);
+  const [reserveUsd, setReserveUsd] = useState(0.01);
   const [sale, setSale] = useState<SaleResult | null>(null);
+  const [approvedFlaggedKeys, setApprovedFlaggedKeys] = useState<Set<string>>(new Set());
 
   const toggleThread = useCallback(
     (id: string) =>
@@ -58,37 +74,51 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const allowsSensitivity = useCallback(
-    (s: Sensitivity) =>
-      (s === "low" && allowLow) ||
-      (s === "medium" && allowMedium) ||
-      (s === "high" && allowHigh),
-    [allowLow, allowMedium, allowHigh],
+  const rules: ConsentRules = useMemo(
+    () => ({
+      allow_low: allowLow,
+      allow_medium: allowMedium,
+      allow_high: allowHigh,
+      reserve_usd: reserveUsd,
+    }),
+    [allowLow, allowMedium, allowHigh, reserveUsd],
   );
 
-  const eligibleBids = useMemo(() => {
-    if (!profile) return [];
+  const { passedBids, flaggedBids, stoppedBids } = useMemo(() => {
+    if (!profile) {
+      return {
+        passedBids: [] as BidWithDecision[],
+        flaggedBids: [] as BidWithDecision[],
+        stoppedBids: [] as BidWithDecision[],
+      };
+    }
     const segById = new Map(profile.segments.map((s) => [s.id, s]));
-    return bids
-      .filter((b) => {
-        const seg = segById.get(b.segment_id);
-        if (!seg) return false;
-        if (!allowsSensitivity(seg.sensitivity)) return false;
-        if (b.bid_usd < reserveUsd) return false;
-        return true;
-      })
-      .sort((a, b) => b.bid_usd - a.bid_usd);
-  }, [bids, profile, allowsSensitivity, reserveUsd]);
+    const passed: BidWithDecision[] = [];
+    const flagged: BidWithDecision[] = [];
+    const stopped: BidWithDecision[] = [];
+    for (const bid of bids) {
+      const segment = segById.get(bid.segment_id);
+      if (!segment) continue;
+      const decision = checkPolicy(bid, segment, rules);
+      const item: BidWithDecision = { bid, segment, decision, key: bidKey(bid) };
+      if (decision.outcome === "pass") passed.push(item);
+      else if (decision.outcome === "flag") flagged.push(item);
+      else stopped.push(item);
+    }
+    passed.sort((a, b) => b.bid.bid_usd - a.bid.bid_usd);
+    flagged.sort((a, b) => b.bid.bid_usd - a.bid.bid_usd);
+    stopped.sort((a, b) => b.bid.bid_usd - a.bid.bid_usd);
+    return { passedBids: passed, flaggedBids: flagged, stoppedBids: stopped };
+  }, [bids, profile, rules]);
 
-  const blockedBids = useMemo(() => {
-    if (!profile) return [];
-    const segById = new Map(profile.segments.map((s) => [s.id, s]));
-    return bids.filter((b) => {
-      const seg = segById.get(b.segment_id);
-      if (!seg) return false;
-      return !allowsSensitivity(seg.sensitivity) || b.bid_usd < reserveUsd;
+  const approveFlagged = useCallback((key: string) => {
+    setApprovedFlaggedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
-  }, [bids, profile, allowsSensitivity, reserveUsd]);
+  }, []);
 
   const runExtract = useCallback(async () => {
     setExtracting(true);
@@ -96,6 +126,7 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setBids([]);
     setSale(null);
+    setApprovedFlaggedKeys(new Set());
     try {
       const threads = SAMPLE_THREADS.filter((t) => selected.includes(t.id));
       const res = await fetch("/api/extract", {
@@ -120,6 +151,7 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     setBidding(true);
     setBids([]);
     setSale(null);
+    setApprovedFlaggedKeys(new Set());
 
     const tasks: Promise<Bid | null>[] = [];
     for (const advertiser of ADVERTISERS) {
@@ -143,12 +175,34 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
       });
     }
     await Promise.allSettled(tasks);
+
+    // Aggregator economics: Thrad syndicates across the downstream network,
+    // so its bid sits above the highest direct advertiser. Bump after all
+    // bids settle.
+    setBids((cur) => {
+      const isThrad = (b: Bid) => b.advertiser.toLowerCase() === "thrad";
+      const otherMax = cur
+        .filter((b) => !isThrad(b))
+        .reduce((m, b) => Math.max(m, b.bid_usd), 0);
+      if (otherMax <= 0) return cur;
+      const floor = Math.round((otherMax + 0.005) * 1000) / 1000;
+      return cur.map((b) =>
+        isThrad(b) && b.bid_usd < floor ? { ...b, bid_usd: floor } : b,
+      );
+    });
+
     setBidding(false);
   }, [profile]);
 
   const approveSale = useCallback(() => {
-    if (eligibleBids.length === 0 || !profile) return null;
-    const winner = eligibleBids[0];
+    if (!profile) return null;
+    // Union of passed bids and the flagged bids the user explicitly approved.
+    const sellable = [
+      ...passedBids,
+      ...flaggedBids.filter((f) => approvedFlaggedKeys.has(f.key)),
+    ].sort((a, b) => b.bid.bid_usd - a.bid.bid_usd);
+    if (sellable.length === 0) return null;
+    const winner = sellable[0].bid;
     const result: SaleResult = {
       segment_id: winner.segment_id,
       advertiser: winner.advertiser,
@@ -158,13 +212,14 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     };
     setSale(result);
     return result;
-  }, [eligibleBids, profile]);
+  }, [profile, passedBids, flaggedBids, approvedFlaggedKeys]);
 
   const reset = useCallback(() => {
     setProfile(null);
     setBids([]);
     setSale(null);
     setExtractError(null);
+    setApprovedFlaggedKeys(new Set());
   }, []);
 
   const value: FlowState = {
@@ -185,9 +240,11 @@ export function FlowProvider({ children }: { children: React.ReactNode }) {
     setAllowHigh,
     reserveUsd,
     setReserveUsd,
-    allowsSensitivity,
-    eligibleBids,
-    blockedBids,
+    passedBids,
+    flaggedBids,
+    stoppedBids,
+    approvedFlaggedKeys,
+    approveFlagged,
     sale,
     approveSale,
     reset,

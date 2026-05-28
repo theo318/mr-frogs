@@ -4,8 +4,8 @@ import { FlowProvider } from "./providers";
 import { Stepper } from "./_components/Stepper";
 
 export const metadata: Metadata = {
-  title: "Intent Exchange 🐸",
-  description: "You sell your own data. Advertisers bid. You approve.",
+  title: "Mr Frogs 🐸",
+  description: "You sell your own data. Advertisers bid. Overmind ensures you stay in control.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <span
-                  className="frog-mascot text-5xl leading-none drop-shadow-[0_0_24px_rgba(163,230,53,0.55)]"
+                  className="frog-mascot text-6xl leading-none drop-shadow-[0_0_28px_rgba(163,230,53,0.55)] sm:text-7xl"
                   aria-hidden
                 >
                   🐸
@@ -33,12 +33,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <div className="text-[10px] uppercase tracking-widest text-violet-400">
                     Cursor <span className="text-lime-400">×</span> Thrad · London 2026
                   </div>
-                  <div className="text-base font-semibold tracking-tight">
+                  <div className="text-4xl font-bold tracking-tight sm:text-5xl">
                     <span className="bg-gradient-to-r from-lime-300 via-lime-400 to-emerald-400 bg-clip-text text-transparent">
-                      Intent
+                      Mr
                     </span>
                     <span className="bg-gradient-to-r from-violet-300 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-                      {" "}Exchange
+                      {" "}Frogs
                     </span>
                   </div>
                 </div>

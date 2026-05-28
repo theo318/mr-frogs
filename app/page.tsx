@@ -26,7 +26,7 @@ export default function ThreadsPage() {
         <PageHeader
           step={1}
           title="Pick threads to monetise"
-          hint="Thrad lets advertisers bid on your attention inside chat. Right now, you're the inventory — not a party to the auction. This flips it. Personal threads only — never your work or client data."
+          hint="Thrad lets advertisers bid on your attention inside chat. Right now, you're the inventory — not a party to the auction. Mr Frogs flips it: you sell your own data, advertisers bid, and Overmind ensures you stay in control. Personal threads only — never your work or client data."
         />
         <div
           className="frog-hero pointer-events-none select-none text-[140px] leading-none drop-shadow-[0_0_45px_rgba(163,230,53,0.6)] sm:text-[180px]"

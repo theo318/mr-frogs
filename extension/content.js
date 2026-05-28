@@ -1,15 +1,15 @@
-// Intent Exchange — ChatGPT content script.
+// Mr Frogs — ChatGPT content script.
 // Shadow-DOM sidebar that captures the user's last prompt, posts to the
-// Intent Exchange backend, and renders the auction inline on chatgpt.com.
+// Mr Frogs backend, and renders the auction inline on chatgpt.com.
 // No bundler, no framework, no Anthropic key in the extension.
 
 (function () {
   // Swap this for the Vercel URL on deploy, e.g.
-  // const BACKEND_URL = "https://intent-exchange.vercel.app";
+  // const BACKEND_URL = "https://mr-frogs.vercel.app";
   const BACKEND_URL = "http://localhost:3000";
 
   // Guard against double-injection on SPA navigation.
-  if (document.getElementById("intent-exchange-root")) return;
+  if (document.getElementById("mr-frogs-root")) return;
 
   // ---------- state ----------
   const state = {
@@ -24,16 +24,14 @@
     allowLow: true,
     allowMedium: true,
     allowHigh: false,
-    reserveUsd: 0.1,
-    autoSell: false,
-    scope: "last", // "last" = last prompt only, "conversation" = full thread
+    reserveUsd: 0.01,
     earnedUsd: 0,
-    lastPromptHash: null,
+    lastUserTurnCount: 0,
   };
 
   // ---------- Shadow DOM root ----------
   const host = document.createElement("div");
-  host.id = "intent-exchange-root";
+  host.id = "mr-frogs-root";
   host.style.cssText = "all: initial; position: relative; z-index: 2147483646;";
   document.body.appendChild(host);
   const shadow = host.attachShadow({ mode: "open" });
@@ -51,7 +49,7 @@
   const badge = document.createElement("button");
   badge.className = "badge";
   badge.type = "button";
-  badge.setAttribute("aria-label", "Open Intent Exchange");
+  badge.setAttribute("aria-label", "Open Mr Frogs");
   badge.textContent = "$";
   shadow.appendChild(badge);
 
@@ -59,7 +57,7 @@
   sidebar.className = "sidebar";
   sidebar.innerHTML = `
     <div class="header">
-      <div class="brand">Intent exchange</div>
+      <div class="brand">Mr Frogs</div>
       <button type="button" class="close-btn" data-action="close" aria-label="Close">×</button>
     </div>
     <div class="earned">
@@ -70,52 +68,20 @@
       <span class="frog" aria-hidden="true">🐸</span>
     </div>
     <div class="body">
-      <div class="section">
-        <div class="section-title">Sell</div>
-        <div class="scope-toggle">
-          <button type="button" class="scope-opt" data-scope="last" data-bind="scope-last">Last prompt</button>
-          <button type="button" class="scope-opt" data-scope="conversation" data-bind="scope-conv">Whole conversation</button>
-        </div>
-        <button type="button" class="primary" data-action="analyse" data-bind="analyse-btn" style="margin-top: 8px;">
-          Analyse last prompt
-        </button>
-      </div>
-
       <div class="section" data-bind="profile-section" hidden>
         <div class="section-title">Intent profile</div>
         <div class="summary" data-bind="summary"></div>
         <div class="segments" data-bind="segments"></div>
       </div>
 
-      <div class="section" data-bind="consent-section" hidden>
-        <div class="section-title">Consent</div>
-        <label class="consent-row" data-bind="row-low">
-          <span class="label-text"><span class="dot"></span>Low — general commercial</span>
-          <input type="checkbox" data-bind="allow-low" />
-        </label>
-        <label class="consent-row" data-bind="row-medium">
-          <span class="label-text"><span class="dot"></span>Medium — career / finance</span>
-          <input type="checkbox" data-bind="allow-medium" />
-        </label>
-        <label class="consent-row" data-bind="row-high">
-          <span class="label-text"><span class="dot"></span>High — sensitive</span>
-          <input type="checkbox" data-bind="allow-high" />
-        </label>
-        <div class="reserve-row">
-          <label>Reserve price</label>
-          <div class="slider-wrap">
-            <input type="range" min="0" max="1" step="0.05" data-bind="reserve" />
-            <div class="reserve-value" data-bind="reserve-value">$0.10</div>
-          </div>
-          <div class="reserve-hint">Bids below this don't complete.</div>
-        </div>
-        <label class="consent-row autosell-row" data-bind="row-autosell" style="margin-top: 14px;">
-          <span class="label-text">
-            <span class="dot"></span>
-            Auto-sell — accept top eligible bid
-          </span>
-          <input type="checkbox" data-bind="auto-sell" />
-        </label>
+      <div class="section">
+        <button
+          type="button"
+          class="config-link"
+          data-action="open-options"
+        >
+          Configure consent settings →
+        </button>
       </div>
 
       <div class="section" data-bind="bids-section" hidden>
@@ -127,9 +93,6 @@
       </div>
 
       <div class="section" data-bind="sale-section" hidden>
-        <button type="button" class="primary" data-action="approve" data-bind="approve-btn">
-          Approve top eligible sale
-        </button>
         <div data-bind="sale-receipt"></div>
       </div>
 
@@ -147,11 +110,6 @@
     return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]),
     );
-  }
-  function hash(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
-    return h.toString(36);
   }
   function allowsSensitivity(s) {
     return (
@@ -183,49 +141,33 @@
     });
   }
 
-  // ---------- prompt capture ----------
-  function captureLastPrompt() {
-    // Primary: rendered user turn in the conversation.
-    const turns = document.querySelectorAll('[data-message-author-role="user"]');
+  // ---------- conversation capture ----------
+  function captureConversation() {
+    // Primary: every rendered turn (user + assistant), in DOM order.
+    const turns = document.querySelectorAll("[data-message-author-role]");
     if (turns.length > 0) {
-      const last = turns[turns.length - 1];
-      const text = (last.textContent || "").trim();
-      if (text) return text;
+      const lines = [];
+      turns.forEach((el) => {
+        const role = el.getAttribute("data-message-author-role") || "unknown";
+        const text = (el.textContent || "").trim();
+        if (!text) return;
+        lines.push(`${role === "user" ? "User" : "Assistant"}: ${text}`);
+      });
+      if (lines.length > 0) return lines.join("\n\n");
     }
-    // Fallback 1: ChatGPT's composer textarea.
+    // Fallback: composer text, so the manual button still works on a fresh
+    // tab before the first turn has rendered.
     const ta = document.querySelector("#prompt-textarea");
     if (ta) {
       const v = (ta.value || ta.textContent || "").trim();
-      if (v) return v;
+      if (v) return `User: ${v}`;
     }
-    // Fallback 2: any contenteditable composer.
     const ce = document.querySelector('form [contenteditable="true"]');
     if (ce) {
       const v = (ce.textContent || "").trim();
-      if (v) return v;
+      if (v) return `User: ${v}`;
     }
     return null;
-  }
-
-  function captureWholeConversation() {
-    // All rendered turns, user + assistant, in DOM order.
-    const turns = document.querySelectorAll('[data-message-author-role]');
-    if (turns.length === 0) return null;
-    const lines = [];
-    turns.forEach((el) => {
-      const role = el.getAttribute("data-message-author-role") || "unknown";
-      const text = (el.textContent || "").trim();
-      if (!text) return;
-      lines.push(`${role === "user" ? "User" : "Assistant"}: ${text}`);
-    });
-    if (lines.length === 0) return null;
-    return lines.join("\n\n");
-  }
-
-  function captureForScope() {
-    return state.scope === "conversation"
-      ? captureWholeConversation()
-      : captureLastPrompt();
   }
 
   // ---------- API ----------
@@ -237,11 +179,10 @@
     state.extractError = null;
     render();
     try {
-      const title = state.scope === "conversation" ? "Live conversation" : "Live prompt";
       const res = await fetch(`${BACKEND_URL}/api/extract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threads: [{ title, full_text: text }] }),
+        body: JSON.stringify({ threads: [{ title: "Live conversation", full_text: text }] }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -291,8 +232,9 @@
     }
     await Promise.allSettled(tasks);
     state.bidding = false;
+    ensureThradLeads();
     render();
-    maybeAutoSell();
+    autoSell();
   }
 
   async function loadAdvertisers() {
@@ -307,18 +249,30 @@
   }
 
   // ---------- actions ----------
-  function maybeAutoSell() {
-    if (!state.autoSell) return;
-    if (state.sale) return;
-    if (state.bidding) return;
-    const eligible = eligibleBids();
-    if (eligible.length === 0) return;
-    approveSale();
+  function ensureThradLeads() {
+    // Aggregator economics: Thrad syndicates across the network, so its bid
+    // is always at least a penny above the highest direct advertiser bid.
+    // We bump the displayed bid (the auction is symbolic) — Thrad still
+    // never wins unless its bid is also eligible under consent + reserve.
+    const isThrad = (b) => (b.advertiser || "").toLowerCase() === "thrad";
+    const thradBids = state.bids.filter(isThrad);
+    if (thradBids.length === 0) return;
+    const otherMax = state.bids
+      .filter((b) => !isThrad(b))
+      .reduce((m, b) => Math.max(m, b.bid_usd || 0), 0);
+    if (otherMax <= 0) return;
+    const floor = Math.round((otherMax + 0.005) * 1000) / 1000;
+    for (const t of thradBids) {
+      if ((t.bid_usd || 0) < floor) t.bid_usd = floor;
+    }
   }
 
-  function approveSale() {
+  function autoSell() {
+    if (state.sale) return;
+    if (state.bidding) return;
+    if (!state.profile) return;
     const eligible = eligibleBids();
-    if (eligible.length === 0 || !state.profile) return;
+    if (eligible.length === 0) return;
     const winner = eligible[0];
     state.sale = {
       segment_id: winner.segment_id,
@@ -345,63 +299,38 @@
     if (action === "close") {
       state.sidebarOpen = false;
       render();
-    } else if (action === "analyse") {
-      const text = captureForScope();
-      if (!text) {
-        state.extractError = "No prompt found yet. Send a message in ChatGPT and try again.";
-        render();
-        return;
-      }
-      runExtract(text);
-    } else if (action === "approve") {
-      approveSale();
-    }
-    const scope = t.getAttribute("data-scope");
-    if (scope === "last" || scope === "conversation") {
-      state.scope = scope;
-      chrome.storage.local.set({ scope });
-      render();
+    } else if (action === "open-options") {
+      // Ask the background service worker to open the options page —
+      // content scripts can't do it directly without tripping Chrome's
+      // popup blocker.
+      chrome.runtime.sendMessage({ type: "open-options" }).catch(() => {
+        // Last-ditch fallback. Will likely be popup-blocked, but if a
+        // user gesture context survives the round-trip this might work.
+        window.open(chrome.runtime.getURL("options.html"), "_blank");
+      });
     }
   });
 
-  $("allow-low").addEventListener("change", (e) => {
-    state.allowLow = e.target.checked;
-    render();
-  });
-  $("allow-medium").addEventListener("change", (e) => {
-    state.allowMedium = e.target.checked;
-    render();
-  });
-  $("allow-high").addEventListener("change", (e) => {
-    state.allowHigh = e.target.checked;
-    render();
-  });
-  $("reserve").addEventListener("input", (e) => {
-    state.reserveUsd = parseFloat(e.target.value);
-    render();
-  });
-  $("auto-sell").addEventListener("change", (e) => {
-    state.autoSell = e.target.checked;
-    chrome.storage.local.set({ autoSell: state.autoSell });
-    // If toggled on with a completed auction that still has eligible bids, fire now.
-    if (state.autoSell) maybeAutoSell();
-    render();
-  });
 
   // ---------- MutationObserver ----------
   let debounceTimer = null;
+  // Only re-analyse when a NEW user message is submitted. Without this gate
+  // the assistant's streaming response keeps mutating the DOM, which would
+  // otherwise re-fire extraction on every token. We watch the count of
+  // user turns; nothing else triggers a new run.
   const observer = new MutationObserver(() => {
-    const text = captureForScope();
-    if (!text) return;
-    const h = hash(text);
-    if (h === state.lastPromptHash) return;
+    const userTurns = document.querySelectorAll('[data-message-author-role="user"]');
+    if (userTurns.length <= state.lastUserTurnCount) return;
+    if (state.extracting) return;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
-      // Only auto-run if we actually captured a rendered user turn,
-      // not just the composer (which the manual button covers).
-      const haveTurn = document.querySelector('[data-message-author-role="user"]');
-      if (!haveTurn) return;
-      state.lastPromptHash = h;
+      const currentCount = document.querySelectorAll(
+        '[data-message-author-role="user"]',
+      ).length;
+      if (currentCount <= state.lastUserTurnCount) return;
+      const text = captureConversation();
+      if (!text) return;
+      state.lastUserTurnCount = currentCount;
       runExtract(text);
     }, 500);
   });
@@ -413,14 +342,6 @@
     sidebar.classList.toggle("open", state.sidebarOpen);
 
     $("earned").textContent = `$${state.earnedUsd.toFixed(2)}`;
-    $("analyse-btn").disabled = state.extracting;
-    $("analyse-btn").textContent = state.extracting
-      ? "Extracting…"
-      : state.scope === "conversation"
-        ? "Analyse whole conversation"
-        : "Analyse last prompt";
-    $("scope-last").classList.toggle("on", state.scope === "last");
-    $("scope-conv").classList.toggle("on", state.scope === "conversation");
 
     // Profile + consent visibility.
     const showProfile = state.extracting || !!state.profile;
@@ -433,9 +354,16 @@
       $("summary").className = "summary";
       $("summary").textContent = state.profile.summary || "";
       $("segments").innerHTML = state.profile.segments
-        .map(
-          (s) => `
-            <div class="segment">
+        .map((s) => {
+          const blocked = !allowsSensitivity(s.sensitivity);
+          const blockedBanner = blocked
+            ? `<div class="seg-blocked">
+                 <span class="seg-blocked-tag">Not sold</span>
+                 ${escapeHtml(s.sensitivity)} sensitivity is blocked in your consent settings — Overmind stopped this segment before it reached any advertiser.
+               </div>`
+            : "";
+          return `
+            <div class="segment${blocked ? " segment-blocked" : ""}">
               <div class="seg-head">
                 <div>
                   <div class="seg-label">${escapeHtml(s.label)}</div>
@@ -449,24 +377,14 @@
                 <span>${Math.round((s.intent_score || 0) * 100)}% intent</span>
                 <span class="floor">$${(s.floor_price_usd || 0).toFixed(2)} floor</span>
               </div>
+              ${blockedBanner}
             </div>
-          `,
-        )
+          `;
+        })
         .join("");
     }
 
     // Consent section is visible as soon as there's a profile.
-    $("consent-section").hidden = !state.profile;
-    $("allow-low").checked = state.allowLow;
-    $("allow-medium").checked = state.allowMedium;
-    $("allow-high").checked = state.allowHigh;
-    $("row-low").classList.toggle("on", state.allowLow);
-    $("row-medium").classList.toggle("on", state.allowMedium);
-    $("row-high").classList.toggle("on", state.allowHigh);
-    $("reserve").value = String(state.reserveUsd);
-    $("reserve-value").textContent = `$${state.reserveUsd.toFixed(2)}`;
-    $("auto-sell").checked = state.autoSell;
-    $("row-autosell").classList.toggle("on", state.autoSell);
 
     // Bids list.
     const eligible = eligibleBids();
@@ -482,8 +400,7 @@
     ].join("");
 
     // Sale section.
-    $("sale-section").hidden = !state.profile;
-    $("approve-btn").disabled = eligible.length === 0 || !!state.sale;
+    $("sale-section").hidden = !state.sale;
     $("sale-receipt").innerHTML = state.sale
       ? `
         <div class="sale">
@@ -527,12 +444,55 @@
   }
 
   // ---------- bootstrap ----------
-  chrome.storage.local.get(["earnedUsd", "autoSell", "scope"], (result) => {
-    if (typeof result.earnedUsd === "number") state.earnedUsd = result.earnedUsd;
-    if (typeof result.autoSell === "boolean") state.autoSell = result.autoSell;
-    if (result.scope === "last" || result.scope === "conversation") state.scope = result.scope;
-    render();
+  chrome.storage.local.get(
+    ["earnedUsd", "allow_low", "allow_medium", "allow_high", "reserve_usd"],
+    (result) => {
+      if (typeof result.earnedUsd === "number") state.earnedUsd = result.earnedUsd;
+      if (typeof result.allow_low === "boolean") state.allowLow = result.allow_low;
+      if (typeof result.allow_medium === "boolean")
+        state.allowMedium = result.allow_medium;
+      if (typeof result.allow_high === "boolean") state.allowHigh = result.allow_high;
+      if (typeof result.reserve_usd === "number") state.reserveUsd = result.reserve_usd;
+      render();
+    },
+  );
+
+  // Stay in sync when the options page mutates consent rules.
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== "local") return;
+    let dirty = false;
+    if (changes.allow_low) {
+      state.allowLow = changes.allow_low.newValue;
+      dirty = true;
+    }
+    if (changes.allow_medium) {
+      state.allowMedium = changes.allow_medium.newValue;
+      dirty = true;
+    }
+    if (changes.allow_high) {
+      state.allowHigh = changes.allow_high.newValue;
+      dirty = true;
+    }
+    if (changes.reserve_usd) {
+      state.reserveUsd = changes.reserve_usd.newValue;
+      dirty = true;
+    }
+    if (dirty) render();
   });
+
+  // Initial auto-run: on a quiescent page (conversation already rendered,
+  // no further DOM mutations), the observer won't fire. Kick off an extract
+  // once after a short delay so the sidebar populates without needing a
+  // manual click.
+  setTimeout(() => {
+    if (state.profile || state.extracting) return;
+    const userTurns = document.querySelectorAll('[data-message-author-role="user"]');
+    if (userTurns.length === 0) return;
+    const text = captureConversation();
+    if (!text) return;
+    state.lastUserTurnCount = userTurns.length;
+    runExtract(text);
+  }, 1500);
   loadAdvertisers();
   render();
 })();

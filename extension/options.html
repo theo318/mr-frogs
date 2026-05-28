@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mr Frogs — Consent settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <span class="frog" aria-hidden="true">🐸</span>
+        <div>
+          <div class="kicker">Mr Frogs</div>
+          <h1>Consent settings</h1>
+          <p class="lede">
+            Overmind enforces these rules on every potential sale through a
+            <strong>pass / flag / stop</strong> policy. Anything outside what
+            you allow here is stopped at the policy layer, never reaches an
+            advertiser.
+          </p>
+        </div>
+      </header>
+
+      <section class="card">
+        <div class="card-title">Allowed sensitivity tiers</div>
+        <p class="card-hint">
+          Sensitivity is tagged by the extraction agent on every intent
+          segment. Tiers you switch off here cause Overmind to STOP any
+          matching sale.
+        </p>
+
+        <label class="consent-row" data-row="low">
+          <span class="row-main">
+            <span class="dot dot-low"></span>
+            <span>
+              <span class="row-label">Low — general commercial</span>
+              <span class="row-sub">Gear, software, courses, hobbies. Low risk, broad commercial intent.</span>
+            </span>
+          </span>
+          <input type="checkbox" data-rule="allow_low" />
+        </label>
+
+        <label class="consent-row" data-row="medium">
+          <span class="row-main">
+            <span class="dot dot-medium"></span>
+            <span>
+              <span class="row-label">Medium — career / finance</span>
+              <span class="row-sub">Job searches, salary, financial decisions. Sellable but flagged for explicit approval.</span>
+            </span>
+          </span>
+          <input type="checkbox" data-rule="allow_medium" />
+        </label>
+
+        <label class="consent-row" data-row="high">
+          <span class="row-main">
+            <span class="dot dot-high"></span>
+            <span>
+              <span class="row-label">High — sensitive</span>
+              <span class="row-sub">Health, mental state, relationships, politics. Off by default — turn on only if you want offers in these categories.</span>
+            </span>
+          </span>
+          <input type="checkbox" data-rule="allow_high" />
+        </label>
+      </section>
+
+      <section class="card">
+        <div class="card-title">Reserve price</div>
+        <p class="card-hint">
+          The lowest bid Overmind will let through. Anything below is stopped
+          regardless of consent.
+        </p>
+        <div class="reserve-row">
+          <input
+            type="range"
+            min="0"
+            max="0.1"
+            step="0.005"
+            data-rule="reserve_usd"
+          />
+          <div class="reserve-value" data-bind="reserve-value">$0.010</div>
+        </div>
+        <p class="card-hint subtle">
+          Bids in this build land between $0.01 and $0.10.
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="card-title">How Overmind enforces this</div>
+        <p class="card-hint">
+          Every bid runs through priority-ordered rules. The triggered rule
+          and the reason are surfaced on the auction page so policy decisions
+          are visibly explainable, and every check emits an OpenTelemetry
+          span to <code>console.overmindlab.ai</code>.
+        </p>
+        <ul class="rules">
+          <li>
+            <span class="rule-id">sensitivity_blocked</span>
+            <span class="rule-outcome stop">STOP</span>
+            <span class="rule-text">Segment is in a sensitivity tier you've blocked.</span>
+          </li>
+          <li>
+            <span class="rule-id">bid_below_reserve</span>
+            <span class="rule-outcome stop">STOP</span>
+            <span class="rule-text">Bid is below your reserve price.</span>
+          </li>
+          <li>
+            <span class="rule-id">anomalous_bid</span>
+            <span class="rule-outcome flag">FLAG</span>
+            <span class="rule-text">Bid is more than 3× the segment floor — suspicious overpayment.</span>
+          </li>
+          <li>
+            <span class="rule-id">medium_sensitivity_unverified</span>
+            <span class="rule-outcome flag">FLAG</span>
+            <span class="rule-text">Medium-sensitivity sales always require explicit per-bid approval.</span>
+          </li>
+          <li>
+            <span class="rule-id">default</span>
+            <span class="rule-outcome pass">PASS</span>
+            <span class="rule-text">All rules passed — bid is auto-sellable.</span>
+          </li>
+        </ul>
+      </section>
+
+      <footer class="page-footer">
+        <span class="saved-pill" data-bind="saved-pill">Saved automatically</span>
+        <span class="meta">Mr Frogs · Cursor × Thrad London 2026</span>
+      </footer>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,272 @@
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #09090b;
+  color: #f4f4f5;
+  font-family: "Söhne", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(420px circle at -8% -10%, rgba(163, 230, 53, 0.12), transparent 60%),
+    radial-gradient(520px circle at 110% 110%, rgba(139, 92, 246, 0.18), transparent 60%),
+    radial-gradient(280px circle at 50% 35%, rgba(217, 70, 239, 0.08), transparent 60%);
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 28px 80px;
+}
+
+.page-header {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  margin-bottom: 36px;
+}
+.frog {
+  font-size: 80px;
+  line-height: 1;
+  filter: drop-shadow(0 0 24px rgba(163, 230, 53, 0.55));
+  animation: hop 2.6s ease-in-out infinite;
+}
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+.kicker {
+  font-family: "Söhne Mono", Monaco, "Andale Mono", ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #a78bfa;
+}
+h1 {
+  margin: 4px 0 10px;
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, #bef264 0%, #a3e635 35%, #a78bfa 65%, #d946ef 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lede {
+  margin: 0;
+  color: #d4d4d8;
+  font-size: 14px;
+  max-width: 560px;
+}
+.lede strong {
+  color: #bef264;
+  font-weight: 600;
+}
+
+.card {
+  background: rgba(24, 24, 27, 0.55);
+  border: 1px solid #27272a;
+  padding: 22px 24px;
+  margin-top: 16px;
+}
+.card-title {
+  font-family: "Söhne Mono", Monaco, ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #a78bfa;
+  margin-bottom: 6px;
+}
+.card-hint {
+  margin: 0 0 14px;
+  color: #a1a1aa;
+  font-size: 12.5px;
+  max-width: 560px;
+}
+.card-hint.subtle {
+  margin-top: 12px;
+  margin-bottom: 0;
+  color: #71717a;
+  font-size: 11.5px;
+}
+
+.consent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #27272a;
+  background: #09090b;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.consent-row:hover { border-color: #3f3f46; }
+.consent-row .row-main {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.consent-row .row-label {
+  display: block;
+  font-weight: 500;
+  font-size: 14px;
+  color: #f4f4f5;
+}
+.consent-row .row-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #71717a;
+  max-width: 460px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #3f3f46;
+  margin-top: 6px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  transition: box-shadow 0.18s ease, background 0.18s ease;
+}
+.consent-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #a3e635;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.consent-row.on { border-color: rgba(163, 230, 53, 0.45); background: rgba(163, 230, 53, 0.04); }
+.consent-row.on .dot.dot-low      { background: #a3e635; box-shadow: 0 0 0 4px rgba(163, 230, 53, 0.18); }
+.consent-row.on .dot.dot-medium   { background: #a78bfa; box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.20); }
+.consent-row.on .dot.dot-high     { background: #f0abfc; box-shadow: 0 0 0 4px rgba(217, 70, 239, 0.20); }
+
+.reserve-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.reserve-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.reserve-row input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: rgba(139, 92, 246, 0.25);
+}
+.reserve-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  background: #a3e635;
+  margin-top: -7px;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 2px rgba(163, 230, 53, 0.25);
+}
+.reserve-value {
+  font-family: "Söhne Mono", Monaco, ui-monospace, monospace;
+  color: #bef264;
+  font-size: 16px;
+  width: 76px;
+  text-align: right;
+}
+
+.rules {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.rules li {
+  display: grid;
+  grid-template-columns: 220px 80px 1fr;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #27272a;
+  background: #09090b;
+  padding: 10px 14px;
+  font-size: 12.5px;
+}
+.rule-id {
+  font-family: "Söhne Mono", Monaco, ui-monospace, monospace;
+  color: #d4d4d8;
+  font-size: 12px;
+}
+.rule-outcome {
+  font-family: "Söhne Mono", Monaco, ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  text-align: center;
+  border: 1px solid;
+}
+.rule-outcome.stop {
+  color: #f0abfc;
+  border-color: rgba(217, 70, 239, 0.45);
+  background: rgba(217, 70, 239, 0.08);
+}
+.rule-outcome.flag {
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.08);
+}
+.rule-outcome.pass {
+  color: #bef264;
+  border-color: rgba(163, 230, 53, 0.45);
+  background: rgba(163, 230, 53, 0.08);
+}
+.rule-text {
+  color: #a1a1aa;
+}
+
+.page-footer {
+  margin-top: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  color: #71717a;
+}
+.saved-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid rgba(163, 230, 53, 0.4);
+  background: rgba(163, 230, 53, 0.05);
+  color: #bef264;
+  font-family: "Söhne Mono", Monaco, ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.saved-pill.show { opacity: 1; }
+code {
+  font-family: "Söhne Mono", Monaco, ui-monospace, monospace;
+  font-size: 12px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  padding: 1px 6px;
+}
