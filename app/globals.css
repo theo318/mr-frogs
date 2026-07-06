@@ -3,51 +3,9 @@
 @tailwind utilities;
 
 html, body { height: 100%; }
-body { font-feature-settings: "ss01", "cv11"; }
 
-/* frog mascot — gentle hop */
-@keyframes frog-hop {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
 @keyframes frog-hop-big {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50%      { transform: translateY(-14px) rotate(2deg); }
 }
-.frog-mascot { animation: frog-hop 2.6s ease-in-out infinite; display: inline-block; }
-.frog-hero   { animation: frog-hop-big 3s ease-in-out infinite; display: inline-block; }
-
-/* range slider styling — lime thumb on a subtle violet track */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  background: transparent;
-}
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px;
-  background: rgba(139, 92, 246, 0.25); /* violet-500/25 */
-  border-radius: 9999px;
-}
-input[type="range"]::-moz-range-track {
-  height: 4px;
-  background: rgba(139, 92, 246, 0.25);
-  border-radius: 9999px;
-}
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  margin-top: -6px;
-  height: 16px;
-  width: 16px;
-  border-radius: 9999px;
-  background: #a3e635; /* lime-400 */
-  box-shadow: 0 0 0 2px rgba(163, 230, 53, 0.25);
-}
-input[type="range"]::-moz-range-thumb {
-  height: 16px;
-  width: 16px;
-  border: none;
-  border-radius: 9999px;
-  background: #a3e635;
-  box-shadow: 0 0 0 2px rgba(163, 230, 53, 0.25);
-}
+.frog-hero { animation: frog-hop-big 3s ease-in-out infinite; display: inline-block; }
